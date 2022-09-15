@@ -1,0 +1,65 @@
+name: IntegrationTest
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGION: ap-northeast-1
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install modules
+        run: |
+          pip install --upgrade pyopenssl
+          pip install localstack awscli-local
+          pip install localstack
+          docker pull localstack/localstack
+          npm install -g aws-cdk-local aws-cdk
+          npm install
+
+      - name: Start LocalStack
+        run: localstack start -d
+
+      - name: Check container status
+        run: |
+          count=0
+          while [ $(docker inspect --format='{{json .State.Health}}' localstack_main | jq '.Status == "healthy"') != "true" ];
+          do
+            count=$(($count + 1))
+            echo "waiting..."
+            sleep 5
+            if [ $count == 10 ]; then
+              echo "Check container status timeout"
+              exit 1
+            fi
+          done
+
+      - name: Configure aws credeintals
+        run: |
+          aws configure set region ${{ env.REGION }}
+
+      - name: Deploy
+        run: |
+          cdklocal bootstrap
+          cdklocal deploy LocalstackStack --require-approval never
+
+      - name: Execute integration test
+        run: |
+          awslocal lambda invoke \
+            --function-name test-function	\
+            --payload '{ "file": "test", "key": "test.txt" }' \
+            --cli-binary-format raw-in-base64-out \
+            --region ${{ env.REGION }} \
+            response.json
+          awslocal s3api get-object \
+            --bucket test-bucket \
+            --key test.txt \
+            --region ${{ env.REGION }} \
+            response.json
