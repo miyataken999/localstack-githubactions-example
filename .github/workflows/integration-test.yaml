@@ -32,7 +32,9 @@ jobs:
           pip install awscli # Install AWS CLI
 
       - name: Start LocalStack
-        run: localstack start -d
+        run: |
+          source myenv/bin/activate  # Explicitly activate virtual environment
+          localstack start -d
 
       - name: Check container status
         run: |
