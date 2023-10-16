@@ -17,6 +17,8 @@ jobs:
 
       - name: Install modules
         run: |
+          python3 -m venv myenv
+          source myenv/bin/activate
           pip install --upgrade pyopenssl
           pip install localstack awscli-local
           pip install localstack
